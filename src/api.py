@@ -5,14 +5,15 @@ import bson
 
 
 @post('/add')
-def add():
+def add(chat_num, user_num, line_x):
     print(dict(request.forms))
-    chat=request.forms.get("Chat 1")
-    user=request.forms.get("Pedro")
-    line=request.forms.get("Hi, how are you doing, yay")
+    chat=request.forms.get(chat_num)
+    user=request.forms.get(user_num)
+    line=request.forms.get(line_x)
+
 
     return {
-        "inserted_doc": str(coll.addChiste(autor,chiste))}
+        "inserted_doc": str(coll.addChiste(chat, user, line))}
 
 
 @get("/chiste/<tipo>")

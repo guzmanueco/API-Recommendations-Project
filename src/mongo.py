@@ -12,9 +12,10 @@ class CollConection:
         print("Inserted", a.inserted_id)
         return a.inserted_id
     
-    def addChiste(self, autor, chiste):
-        document={'autor':autor,
-                'chiste':chiste}
+    def addLine(self, autor, chiste):
+        document={'chat':chat,
+                'user':user,
+                'line':line}
         return self.addDocument(document)
 
     
