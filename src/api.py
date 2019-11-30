@@ -13,7 +13,7 @@ def add(chat_num, user_num, line_x):
 
 
     return {
-        "inserted_doc": str(coll.addChiste(chat, user, line))}
+        "inserted_doc": str(coll.addLine(chat, user, line))}
 
 
 @get("/chiste/<tipo>")
