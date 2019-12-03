@@ -1,5 +1,5 @@
 import os
-from bottle import route, run, get, error
+from bottle import route, run, get, error, post, request
 from pymongo import MongoClient
 from dotenv import load_dotenv
 import dns
@@ -7,11 +7,12 @@ import json
 import pymongo
 from bson.json_util import dumps
 from textblob import TextBlob
-
-
-
-
-
+import regex as re
+from sklearn.metrics.pairwise import cosine_similarity as distance
+import pandas as pd
+from sklearn.feature_extraction.text import CountVectorizer
+from bottle import get, run
+import numpy as np
 
 load_dotenv()
 url=os.getenv('password')
@@ -69,7 +70,7 @@ def sentiments():
     sentiment=dict()
     text=''
     for e in coll.find():
-        text+=e['text']
+        text+=e['text']+' '
     sentiment['analysis']=TextBlob(text).sentiment
     return sentiment
 
@@ -141,6 +142,68 @@ def sentiment_user_chat(x,user):
             conversation[user]+=e['text']
     conv_analysis[user]=TextBlob(conversation[user]).sentiment
     return conv_analysis
+
+
+@route('/data')
+def data():
+    return dumps(coll.find())
+
+@post('/document/create')
+def newDocumentUser():
+    #posts new user, message and iduser
+    name = str(request.forms.get("userName"))
+    text=str(request.forms.get('text'))
+    chat=int(request.forms.get('idChat'))
+    new_id = max(coll.distinct("idUser")) + 1
+    new_id_message=max(coll.distinct("idMessage"))+1
+
+    new_document = {
+        "idUser": new_id,
+        "userName": name,
+        "idMessage":new_id_message,
+        "idChat":chat,
+        "text":text
+    }
+
+    coll.insert_one(new_document)
+
+    print(f"Message added to collection with id {new_id_message} in chat {chat}")
+    return new_document['text']
+
+
+def getting_every_sentence():
+    #gets a dictionary of users as keys and their sentences as values
+    x=list(coll.find())
+    users_dict=dict()
+    for i in range(len(x)):
+        if x[i]['userName'] not in users_dict:
+            users_dict[x[i]['userName']]=x[i]['text']
+        else:
+            users_dict[x[i]['userName']]+=' ' +x[i]['text']
+    for e in users_dict:
+        users_dict[e]=re.sub(r"[^a-zA-Z0-9]+", ' ', users_dict[e])
+    return users_dict
+
+def getting_sparse_matrix():
+    #gets the sparse matrix using the dictionary obtained in the previous function
+    count_vectorizer = CountVectorizer(stop_words='english')
+    sparse_matrix = count_vectorizer.fit_transform(getting_every_sentence().values())
+    return sparse_matrix
+
+@get('/recommendation/user=<user>')
+def recommending_user(user):
+    #returns a recommendation for user to talk to
+    recommendation_dict=dict()
+    count_vectorizer=CountVectorizer(stop_words='english')
+    sparse_matrix = count_vectorizer.fit_transform(getting_every_sentence().values())
+    doc_term_matrix = getting_sparse_matrix().todense()
+    df = pd.DataFrame(doc_term_matrix, columns=count_vectorizer.get_feature_names(), index=getting_every_sentence().keys())
+    similarity_matrix = distance(df, df)
+    sim_df = pd.DataFrame(similarity_matrix, columns=getting_every_sentence().keys(), index=getting_every_sentence().keys())
+    np.fill_diagonal(sim_df.values, 0)
+    final_matrix=sim_df.idxmax()
+    recommendation_dict[user]=final_matrix.loc[user]
+    return recommendation_dict
 
 @error(404)
 def error404(error):
